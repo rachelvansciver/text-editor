@@ -25,8 +25,6 @@
 #define KILO_QUIT_TIMES 3
 #define CTRL_KEY(k) ((k) & 0x1f)
 
-#define HL_HIGHLIGHT_NUMBERS(1<<0)
-#define HL_HIGHLIGHT_STRINGS(1<<1)
 
 
 enum editorKey {
@@ -43,12 +41,16 @@ enum editorKey {
 };
 
 enum editorHighlight {
-    HL_NORMAL = 0;
+    HL_NORMAL = 0,
     HL_NUMBER,
     HL_MATCH,
     HL_STRING,
     HL_COMMENT
 };
+
+#define HL_HIGHLIGHT_NUMBERS (1<<0)
+#define HL_HIGHLIGHT_STRINGS (1<<1)
+
 /*** data ***/
 struct editorSyntax {
     char *filetype;
@@ -90,12 +92,14 @@ struct editorSyntax HLDB[] = {
   {
     "c",
     C_HL_extensions,
-    "//"
     HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
   },
 };
+
 #define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0]))
+
 /*** prototypes ***/
+
 void editorSetStatusMessage(const char *fmt, ...);
 
 void editorRefreshScreen();
@@ -114,7 +118,7 @@ int editorSyntaxToColor(int hl) {
   }
 }
 
-int is(seperator(int c)) {
+int is_seperator(int c) {
     return isspace(c) || c == '\0' || strchr(",.()+-/*=~5<>[];", c) != NULL;
 }
 
@@ -158,7 +162,7 @@ void editorUpdateSyntax(erow *row) {
         continue;
       }
     }
-    prev_sep = is_separator(c);
+    prev_sep = is_seperator(c);
     i++;
   }
 }
@@ -275,6 +279,33 @@ int getWindowSize(int *rows, int *cols) {
 }
 
 /*** row operations ***/
+
+void editorSelectSyntaxHighlight() {
+  E.syntax = NULL;
+  if (E.filename == NULL) return;
+
+  for (unsigned int j = 0; j < HLDB_ENTRIES; j++) {
+    struct editorSyntax *s = &HLDB[j];
+    unsigned int i = 0;
+    while (s->filematch[i]) {
+      char *p = strstr(E.filename, s->filematch[i]);
+      if (p != NULL) {
+        int patlen = strlen(s->filematch[i]);
+        if (s->filematch[i][0] != '.' || p[patlen] == '\0') {
+          E.syntax = s;
+
+          int filerow;
+          for (filerow = 0; filerow < E.numrows; filerow++) {
+            editorUpdateSyntax(&E.row[filerow]);
+          }
+
+          return;
+        }
+      }
+      i++;
+    }
+  }
+}
 
 void editorRowAppendString(erow *row, char *s, size_t len) {
     row -> chars = realloc(row -> chars, row -> size + len + 1);
